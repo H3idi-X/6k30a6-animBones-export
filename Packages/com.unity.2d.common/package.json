@@ -1,0 +1,30 @@
+{
+    "name": "com.unity.2d.common",
+    "displayName": "2D Common",
+    "version": "12.0.0",
+    "unity": "6000.3",
+    "description": "2D Common is a package that contains shared functionalities that are used by most of the other 2D packages.",
+    "keywords": [
+        "2d"
+    ],
+    "category": "2D",
+    "dependencies": {
+        "com.unity.2d.sprite": "1.0.0",
+        "com.unity.mathematics": "1.1.0",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.uielements": "1.0.0",
+        "com.unity.modules.animation": "1.0.0",
+        "com.unity.burst": "1.8.4"
+    },
+    "samples": [
+        {
+            "displayName": "Sprite Atlas Samples",
+            "description": "Samples to get started with SpriteAtlas",
+            "path": "Samples~/SpriteAtlas"
+        }
+    ],
+    "relatedPackages": {
+        "com.unity.2d.common.tests": "12.0.0"
+    },
+    "unityRelease": "0a1"
+}
