@@ -111,9 +111,8 @@ namespace UnityEditor.U2D.Animation
             };
         }
 
-        public static UnityEngine.U2D.SpriteBone[] ToSpriteBone(this BoneCache[] bones, Matrix4x4 rootTransform)
+        public static BoneCache[] GetSortedBones(this BoneCache[] bones)
         {
-            List<UnityEngine.U2D.SpriteBone> spriteBones = new List<UnityEngine.U2D.SpriteBone>();
             List<BoneCache> sortedBones = new List<BoneCache>();
             List<BoneCache> rootBones = new List<BoneCache>();
 
@@ -131,10 +130,19 @@ namespace UnityEditor.U2D.Animation
             for (int i = 0; i < rootBones.Count; i++)
                 AddBoneAndChildren(rootBones[i], bones, sortedBones);
 
+            return sortedBones.ToArray();
+        }
+
+        public static UnityEngine.U2D.SpriteBone[] ToSpriteBone(this BoneCache[] bones, Matrix4x4 rootTransform)
+        {
+            // Use sorted bones to ensure consistency with SetBones
+            BoneCache[] sortedBones = bones.GetSortedBones();
+            
+            List<UnityEngine.U2D.SpriteBone> spriteBones = new List<UnityEngine.U2D.SpriteBone>();
+
             foreach (BoneCache bone in sortedBones)
             {
-                int parentId = sortedBones.IndexOf(bone.parentBone);
-
+                int parentId = Array.IndexOf(sortedBones, bone.parentBone); 
                 spriteBones.Add(bone.ToSpriteBone(rootTransform, parentId));
             }
 

@@ -78,8 +78,11 @@ namespace UnityEditor.U2D.Animation
 
         void SetBones(BoneCache[] boneCache)
         {
-            FixWeights(boneCache);
-            SetCompatibleBoneSet(boneCache);
+            // Sort bones to match ToSpriteBone order when user reorders bones
+            BoneCache[] sortedBones = boneCache.GetSortedBones();
+            
+            FixWeights(sortedBones);
+            SetCompatibleBoneSet(sortedBones);
         }
 
         void FixWeights(BoneCache[] newBones)
@@ -120,4 +123,6 @@ namespace UnityEditor.U2D.Animation
             }
         }
     }
+
+
 }
