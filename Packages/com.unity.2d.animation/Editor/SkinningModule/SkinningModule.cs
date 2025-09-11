@@ -489,9 +489,13 @@ namespace UnityEditor.U2D.Animation
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
-            ApplyBone(skinningCache, dataProvider);
-            ApplyMesh(skinningCache, dataProvider);
+            
+            // Store bone mapping information for each sprite
+            var spriteBoneMapping = new Dictionary<SpriteCache, UnityEngine.U2D.SpriteBone[]>();
+            ApplyBone(skinningCache, dataProvider, spriteBoneMapping);
+            ApplyMesh(skinningCache, dataProvider, spriteBoneMapping);
             ApplyCharacter(skinningCache, dataProvider);
+            
             skinningCache.applyingChanges = false;
         }
 
@@ -509,7 +513,7 @@ namespace UnityEditor.U2D.Animation
             m_Analytics.SendApplyEvent(sprites.Length, spriteBoneCount, bones);
         }
 
-        static void ApplyBone(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider)
+        static void ApplyBone(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider, Dictionary<SpriteCache, UnityEngine.U2D.SpriteBone[]> spriteBoneMapping)
         {
             ISpriteBoneDataProvider boneDataProvider = dataProvider.GetDataProvider<ISpriteBoneDataProvider>();
             if (boneDataProvider != null)
@@ -518,12 +522,17 @@ namespace UnityEditor.U2D.Animation
                 foreach (SpriteCache sprite in sprites)
                 {
                     BoneCache[] bones = sprite.GetSkeleton().bones;
-                    boneDataProvider.SetBones(new GUID(sprite.id), bones.ToSpriteBone(sprite.localToWorldMatrix).ToList());
+                    UnityEngine.U2D.SpriteBone[] spriteBones = bones.ToSpriteBone(sprite.localToWorldMatrix);
+                    
+                    // Store the bone mapping information for later use in ApplyMesh
+                    spriteBoneMapping[sprite] = spriteBones;
+                    
+                    boneDataProvider.SetBones(new GUID(sprite.id), spriteBones.ToList());
                 }
             }
         }
 
-        static void ApplyMesh(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider)
+        static void ApplyMesh(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider, Dictionary<SpriteCache, UnityEngine.U2D.SpriteBone[]> spriteBoneMapping)
         {
             ISpriteMeshDataProvider meshDataProvider = dataProvider.GetDataProvider<ISpriteMeshDataProvider>();
             if (meshDataProvider != null)
@@ -535,10 +544,15 @@ namespace UnityEditor.U2D.Animation
                     GUID guid = new GUID(sprite.id);
 
                     Vertex2DMetaData[] vertices = new Vertex2DMetaData[mesh.vertexCount];
+                    
+                    // Get the stored bone mapping for this sprite
+                    UnityEngine.U2D.SpriteBone[] spriteBones = spriteBoneMapping.TryGetValue(sprite, out var bones) ? bones : null;
+                    
                     for (int i = 0; i < vertices.Length; ++i)
                     {
                         vertices[i].position = mesh.vertices[i];
-                        vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false);
+                        // Use the new overload with sprite bones parameter (null if not available)
+                        vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false, spriteBones);
                     }
 
                     meshDataProvider.SetVertices(guid, vertices);

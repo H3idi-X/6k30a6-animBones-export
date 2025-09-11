@@ -48,7 +48,7 @@ namespace UnityEditor.U2D.Animation
             }
         }
 
-        public static BoneWeight ToBoneWeight(this EditableBoneWeight editableBoneWeight, bool sortByWeight)
+        public static BoneWeight ToBoneWeight(this EditableBoneWeight editableBoneWeight, bool sortByWeight, UnityEngine.U2D.SpriteBone[] spriteBones = null)
         {
             BoneWeight boneWeight = new BoneWeight();
 
@@ -59,9 +59,18 @@ namespace UnityEditor.U2D.Animation
 
                 for (int i = 0; i < editableBoneWeight.Count; ++i)
                 {
+                    int boneIndex = editableBoneWeight[i].boneIndex;
+                    
+                    // Apply bone mapping if spriteBones is provided
+                    if (spriteBones != null)
+                    {
+                        // Map the bone index using sprite bones information
+                        boneIndex = MapBoneIndex(boneIndex, spriteBones);
+                    }
+                    
                     s_BoneWeightDataList.Add(new BoneWeightData()
                     {
-                        boneIndex = editableBoneWeight[i].boneIndex,
+                        boneIndex = boneIndex,
                         weight = editableBoneWeight[i].weight
                     });
                 }
@@ -79,6 +88,18 @@ namespace UnityEditor.U2D.Animation
             }
 
             return boneWeight;
+        }
+
+        private static int MapBoneIndex(int originalIndex, UnityEngine.U2D.SpriteBone[] spriteBones)
+        {
+            // For now, return the original index
+            // TODO: Implement proper bone mapping logic based on sprite bones
+            // This would involve mapping old bone indices to new bone indices
+            // when bone order has changed
+            if (originalIndex < 0 || originalIndex >= spriteBones.Length)
+                return originalIndex;
+            
+            return originalIndex;
         }
 
         public static bool ContainsBoneIndex(this EditableBoneWeight editableBoneWeight, int boneIndex)
