@@ -114,6 +114,23 @@ namespace UnityEditor.U2D.Animation
         public static UnityEngine.U2D.SpriteBone[] ToSpriteBone(this BoneCache[] bones, Matrix4x4 rootTransform)
         {
             List<UnityEngine.U2D.SpriteBone> spriteBones = new List<UnityEngine.U2D.SpriteBone>();
+
+            foreach (BoneCache bone in bones)
+            {
+                int parentId = -1;
+
+                if (ArrayUtility.Contains(bones, bone.parentBone))
+                    parentId = Array.IndexOf(bones, bone.parentBone);
+
+                spriteBones.Add(bone.ToSpriteBone(rootTransform, parentId));
+            }
+
+            return spriteBones.ToArray();
+        }
+
+        public static UnityEngine.U2D.SpriteBone[] ToSpriteBoneToSave(this BoneCache[] bones, Matrix4x4 rootTransform)
+        {
+            List<UnityEngine.U2D.SpriteBone> spriteBones = new List<UnityEngine.U2D.SpriteBone>();
             List<BoneCache> sortedBones = new List<BoneCache>();
             List<BoneCache> rootBones = new List<BoneCache>();
 

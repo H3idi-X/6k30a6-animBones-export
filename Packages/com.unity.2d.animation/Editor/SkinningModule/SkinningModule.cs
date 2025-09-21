@@ -489,9 +489,9 @@ namespace UnityEditor.U2D.Animation
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
-            
+
             // Create bone index mapping for each sprite
-            var spriteBoneIndexMapping = new Dictionary<SpriteCache, Dictionary<int, int>>();
+            Dictionary<SpriteCache, Dictionary<int, int>> spriteBoneIndexMapping = new();
             ApplyBone(skinningCache, dataProvider, spriteBoneIndexMapping);
             ApplyMesh(skinningCache, dataProvider, spriteBoneIndexMapping);
             ApplyCharacter(skinningCache, dataProvider);
@@ -522,7 +522,7 @@ namespace UnityEditor.U2D.Animation
                 foreach (SpriteCache sprite in sprites)
                 {
                     BoneCache[] bones = sprite.GetSkeleton().bones;
-                    UnityEngine.U2D.SpriteBone[] spriteBones = bones.ToSpriteBone(sprite.localToWorldMatrix);
+                    UnityEngine.U2D.SpriteBone[] spriteBones = bones.ToSpriteBoneToSave(sprite.localToWorldMatrix);
             
                     // Create bone index mapping: old index -> new index based on GUID
                     Dictionary<int, int> boneMapping = new();
