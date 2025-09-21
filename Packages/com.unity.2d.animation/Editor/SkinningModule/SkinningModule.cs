@@ -489,9 +489,13 @@ namespace UnityEditor.U2D.Animation
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
-            ApplyBone(skinningCache, dataProvider);
-            ApplyMesh(skinningCache, dataProvider);
+            
+            // Create bone index mapping for each sprite
+            var spriteBoneIndexMapping = new Dictionary<SpriteCache, Dictionary<int, int>>();
+            ApplyBone(skinningCache, dataProvider, spriteBoneIndexMapping);
+            ApplyMesh(skinningCache, dataProvider, spriteBoneIndexMapping);
             ApplyCharacter(skinningCache, dataProvider);
+            
             skinningCache.applyingChanges = false;
         }
 
@@ -509,7 +513,7 @@ namespace UnityEditor.U2D.Animation
             m_Analytics.SendApplyEvent(sprites.Length, spriteBoneCount, bones);
         }
 
-        static void ApplyBone(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider)
+        static void ApplyBone(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider, Dictionary<SpriteCache, Dictionary<int, int>> spriteBoneIndexMapping)
         {
             ISpriteBoneDataProvider boneDataProvider = dataProvider.GetDataProvider<ISpriteBoneDataProvider>();
             if (boneDataProvider != null)
@@ -518,12 +522,33 @@ namespace UnityEditor.U2D.Animation
                 foreach (SpriteCache sprite in sprites)
                 {
                     BoneCache[] bones = sprite.GetSkeleton().bones;
-                    boneDataProvider.SetBones(new GUID(sprite.id), bones.ToSpriteBone(sprite.localToWorldMatrix).ToList());
+                    UnityEngine.U2D.SpriteBone[] spriteBones = bones.ToSpriteBone(sprite.localToWorldMatrix);
+            
+                    // Create bone index mapping: old index Å® new index based on GUID
+                    Dictionary<int, int> boneMapping = new Dictionary<int, int>();
+                    for (int newIndex = 0; newIndex < spriteBones.Length; newIndex++)
+                    {
+                        // Find the original bone index by comparing GUID
+                        for (int oldIndex = 0; oldIndex < bones.Length; oldIndex++)
+                        {
+                            if (bones[oldIndex].guid == spriteBones[newIndex].guid)
+                            {
+                                if (oldIndex != newIndex)
+                                {
+                                    boneMapping[oldIndex] = newIndex;
+                                }
+                                break;
+                            }
+                        }
+                    }
+            
+                    spriteBoneIndexMapping[sprite] = boneMapping;
+                    boneDataProvider.SetBones(new GUID(sprite.id), spriteBones.ToList());
                 }
             }
         }
 
-        static void ApplyMesh(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider)
+        static void ApplyMesh(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider, Dictionary<SpriteCache, Dictionary<int, int>> spriteBoneIndexMapping)
         {
             ISpriteMeshDataProvider meshDataProvider = dataProvider.GetDataProvider<ISpriteMeshDataProvider>();
             if (meshDataProvider != null)
@@ -535,10 +560,22 @@ namespace UnityEditor.U2D.Animation
                     GUID guid = new GUID(sprite.id);
 
                     Vertex2DMetaData[] vertices = new Vertex2DMetaData[mesh.vertexCount];
+            
+                    // Get bone index mapping for this sprite
+                    Dictionary<int, int> boneMapping = spriteBoneIndexMapping.TryGetValue(sprite, out var mapping) ? mapping : null;
+            
                     for (int i = 0; i < vertices.Length; ++i)
                     {
                         vertices[i].position = mesh.vertices[i];
-                        vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false);
+                        // Use the bone index mapping to correct vertex weights
+                        if (boneMapping != null && boneMapping.Count > 0)
+                        {
+                            vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false, boneMapping);
+                        }
+                        else
+                        {
+                            vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false);
+                        }
                     }
 
                     meshDataProvider.SetVertices(guid, vertices);

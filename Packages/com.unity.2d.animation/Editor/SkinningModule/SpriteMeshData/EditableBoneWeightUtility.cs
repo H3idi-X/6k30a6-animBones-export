@@ -81,6 +81,47 @@ namespace UnityEditor.U2D.Animation
             return boneWeight;
         }
 
+        public static BoneWeight ToBoneWeight(this EditableBoneWeight editableBoneWeight, bool sortByWeight, Dictionary<int, int> boneIndexMapping)
+        {
+            BoneWeight boneWeight = new BoneWeight();
+
+            if (editableBoneWeight.Count > 0)
+            {
+                s_BoneWeightDataList.Clear();
+                s_BoneWeightDataList.Capacity = editableBoneWeight.Count;
+
+                for (int i = 0; i < editableBoneWeight.Count; ++i)
+                {
+                    int boneIndex = editableBoneWeight[i].boneIndex;
+                    
+                    // Apply bone index mapping if provided
+                    if (boneIndexMapping != null && boneIndexMapping.TryGetValue(boneIndex, out int mappedIndex))
+                    {
+                        boneIndex = mappedIndex;
+                    }
+                    
+                    s_BoneWeightDataList.Add(new BoneWeightData()
+                    {
+                        boneIndex = boneIndex,
+                        weight = editableBoneWeight[i].weight
+                    });
+                }
+
+                if (sortByWeight)
+                    s_BoneWeightDataList.Sort();
+
+                int count = Mathf.Min(editableBoneWeight.Count, 4);
+
+                for (int i = 0; i < count; ++i)
+                {
+                    BoneWeightExtensions.SetBoneIndex(ref boneWeight, i, s_BoneWeightDataList[i].boneIndex);
+                    BoneWeightExtensions.SetWeight(ref boneWeight, i, s_BoneWeightDataList[i].weight);
+                }
+            }
+
+            return boneWeight;
+        }
+
         public static bool ContainsBoneIndex(this EditableBoneWeight editableBoneWeight, int boneIndex)
         {
             return GetChannelFromBoneIndex(editableBoneWeight, boneIndex) > -1;
