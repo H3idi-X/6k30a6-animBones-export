@@ -495,8 +495,69 @@ namespace UnityEditor.U2D.Animation
             ApplyBone(skinningCache, dataProvider, spriteBoneIndexMapping);
             ApplyMesh(skinningCache, dataProvider, spriteBoneIndexMapping);
             ApplyCharacter(skinningCache, dataProvider);
-            
+
+            // Fix vertex weights after bone reordering to maintain proper mapping
+            FixSpriteCacheWeights(skinningCache, spriteBoneIndexMapping);
+
             skinningCache.applyingChanges = false;
+        }
+        static void FixSpriteCacheWeights(SkinningCache skinningCache, Dictionary<SpriteCache, Dictionary<int, int>> spriteBoneIndexMapping)
+        {
+            SpriteCache[] sprites = skinningCache.GetSprites();
+            foreach (SpriteCache sprite in sprites)
+            {
+                // Get bone index mapping for this sprite
+                if (!spriteBoneIndexMapping.TryGetValue(sprite, out Dictionary<int, int> boneMapping) ||
+                    boneMapping.Count == 0)
+                    continue;
+
+                MeshCache mesh = sprite.GetMesh();
+                if (mesh == null) continue;
+                // Update vertex weights in the sprite's mesh cache
+                EditableBoneWeight[] vertexWeights = mesh.vertexWeights;
+                for (int i = 0; i < vertexWeights.Length; i++)
+                {
+                    EditableBoneWeight originalWeight = vertexWeights[i];
+                    EditableBoneWeight updatedWeight = new EditableBoneWeight();
+
+                    // Remap bone indices in the vertex weight
+                    for (int channel = 0; channel < originalWeight.Count; channel++)
+                    {
+                        BoneWeightChannel weightChannel = originalWeight[channel];
+                        if (!weightChannel.enabled || weightChannel.weight <= 0f)
+                            continue;
+
+                        // Find the new bone index using the mapping
+                        if (boneMapping.TryGetValue(weightChannel.boneIndex, out int newBoneIndex))
+                        {
+                            updatedWeight.AddChannel(newBoneIndex, weightChannel.weight, true);
+                        }
+                        else
+                        {
+                            // Bone was removed or mapping not found, keep original index
+                            updatedWeight.AddChannel(weightChannel.boneIndex, weightChannel.weight, true);
+                        }
+                    }
+
+                    // Normalize and clamp the updated weight
+                    updatedWeight.UnifyChannelsWithSameBoneIndex();
+                    updatedWeight.Normalize();
+                    updatedWeight.Clamp(4);
+
+                    vertexWeights[i] = updatedWeight;
+                }
+
+                // Trigger mesh preview update
+                MeshPreviewCache meshPreview = sprite.GetMeshPreview();
+                if (meshPreview != null)
+                {
+                    meshPreview.SetWeightsDirty();
+                    meshPreview.SetMeshDirty();
+                }
+
+                // Notify that mesh data has changed
+                skinningCache.events.meshChanged.Invoke(mesh);
+            }
         }
 
         private void DoApplyAnalytics()
