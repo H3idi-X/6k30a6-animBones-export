@@ -524,8 +524,8 @@ namespace UnityEditor.U2D.Animation
                     BoneCache[] bones = sprite.GetSkeleton().bones;
                     UnityEngine.U2D.SpriteBone[] spriteBones = bones.ToSpriteBone(sprite.localToWorldMatrix);
             
-                    // Create bone index mapping: old index Å® new index based on GUID
-                    Dictionary<int, int> boneMapping = new Dictionary<int, int>();
+                    // Create bone index mapping: old index -> new index based on GUID
+                    Dictionary<int, int> boneMapping = new();
                     for (int newIndex = 0; newIndex < spriteBones.Length; newIndex++)
                     {
                         // Find the original bone index by comparing GUID
@@ -533,10 +533,8 @@ namespace UnityEditor.U2D.Animation
                         {
                             if (bones[oldIndex].guid == spriteBones[newIndex].guid)
                             {
-                                if (oldIndex != newIndex)
-                                {
-                                    boneMapping[oldIndex] = newIndex;
-                                }
+                                // Always store the complete mapping information
+                                boneMapping[oldIndex] = newIndex;
                                 break;
                             }
                         }
