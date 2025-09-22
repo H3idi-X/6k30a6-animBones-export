@@ -485,10 +485,52 @@ namespace UnityEditor.U2D.Animation
             return true;
         }
 
+
+
         internal static void ApplyChanges(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider)
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
+            Dictionary<SpriteCache, Dictionary<int, int>> boneIndexMappings = new Dictionary<SpriteCache, Dictionary<int, int>>();
+            CharacterPart[] characterParts = null;
+
+            if (skinningCache.hasCharacter)
+            {
+                CharacterCache character = skinningCache.character;
+                BoneCache[] characterBones = character.skeleton.bones;
+                CharacterPartCache[] parts = character.parts;
+
+                // Generate CharacterParts
+                characterParts = parts.Select(x =>
+                    new CharacterPart()
+                    {
+                        spriteId = x.sprite.id,
+                        spritePosition = new RectInt((int)x.position.x, (int)x.position.y, (int)x.sprite.textureRect.width, (int)x.sprite.textureRect.height),
+                        bones = x.bones.Select(bone => Array.IndexOf(characterBones, bone)).Where(bone => bone != -1).ToArray()
+                    }
+                ).ToArray();
+
+                // Create bone mapping dictionary infr eatch sprite
+                foreach (CharacterPartCache part in parts)
+                {
+                    if (!boneIndexMappings.ContainsKey(part.sprite))
+                    {
+                        var mapping = new Dictionary<int, int>();
+                        BoneCache[] spriteBones = part.sprite.GetSkeleton().bones;
+
+                        for (int i = 0; i < spriteBones.Length; i++)
+                        {
+                            int characterIndex = Array.IndexOf(characterBones, spriteBones[i]);
+                            if (characterIndex != -1)
+                            {
+                                mapping[i] = characterIndex;
+                            }
+                        }
+                        boneIndexMappings[part.sprite] = mapping;
+                    }
+                }
+            }
+
             ApplyBone(skinningCache, dataProvider);
             ApplyMesh(skinningCache, dataProvider);
             ApplyCharacter(skinningCache, dataProvider);
@@ -538,7 +580,9 @@ namespace UnityEditor.U2D.Animation
                     for (int i = 0; i < vertices.Length; ++i)
                     {
                         vertices[i].position = mesh.vertices[i];
-                        vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false);
+                        vertices[i].boneWeight = skinningCache.GetMesh(sprite).vertexWeights[i].ToBoneWeight(false);
+                        //Debug.Log($"Index = {i},index {vertices[i].boneWeight.boneIndex0}");
+                        //vertices[i].boneWeight = mesh.vertexWeights[i].ToBoneWeight(false);
                     }
 
                     meshDataProvider.SetVertices(guid, vertices);
@@ -561,6 +605,18 @@ namespace UnityEditor.U2D.Animation
                 data.bones = characterBones.ToSpriteBone(Matrix4x4.identity);
                 data.pivot = character.pivot;
                 CharacterPartCache[] parts = character.parts;
+#if false        // Debug.
+                data.parts = parts.Select(x => 
+                    new CharacterPart()
+                    {
+                        spriteId = x.sprite.id,
+                        spritePosition = new RectInt((int)x.position.x, (int)x.position.y, (int)x.sprite.textureRect.width, (int)x.sprite.textureRect.height),
+                        bones = x.bones.Select(bone => Array.IndexOf(characterBones, bone)).Where(bone => bone != -1).ToArray(),
+                        parentGroup = x.parentGroup,
+                        order = x.order
+                    }
+                ).ToArray();
+#else
                 data.parts = parts.Select(x =>
                     new CharacterPart()
                     {
@@ -569,7 +625,7 @@ namespace UnityEditor.U2D.Animation
                         bones = x.bones.Select(bone => Array.IndexOf(characterBones, bone)).Where(bone => bone != -1).ToArray()
                     }
                 ).ToArray();
-
+#endif
                 characterDataProvider.SetCharacterData(data);
 
             }
