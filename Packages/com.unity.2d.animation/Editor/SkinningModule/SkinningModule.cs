@@ -570,7 +570,7 @@ namespace UnityEditor.U2D.Animation
 
             ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
             ApplyCharacter(skinningCache, dataProvider, characterParts);
-            skinningCache.applyingChanges = false;
+            if (false)
             {
                 ICharacterDataProvider characterDataProvider = dataProvider.GetDataProvider<ICharacterDataProvider>();
                 CharacterData newCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
@@ -579,6 +579,7 @@ namespace UnityEditor.U2D.Animation
 
                 Debug.Log($"Meta file bones: {string.Join(", ", newMetaFileBones.Select(b => b.name))}");
             }
+            skinningCache.applyingChanges = false;
 
 
         }
