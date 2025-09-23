@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.U2D.Sprites;
 using UnityEngine;
+using UnityEngine.U2D;
 
 namespace UnityEditor.U2D.Animation
 {
@@ -491,6 +492,8 @@ namespace UnityEditor.U2D.Animation
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
+            ApplyBone(skinningCache, dataProvider);
+
             Dictionary<SpriteCache, Dictionary<int, int>> boneIndexMappings = new Dictionary<SpriteCache, Dictionary<int, int>>();
             CharacterPart[] characterParts = null;
 
@@ -500,7 +503,15 @@ namespace UnityEditor.U2D.Animation
                 BoneCache[] characterBones = character.skeleton.bones;
                 CharacterPartCache[] parts = character.parts;
 
-                // Generate CharacterParts
+                // 1. メタファイルから実際のボーン順序を取得
+                ICharacterDataProvider characterDataProvider = dataProvider.GetDataProvider<ICharacterDataProvider>();
+                CharacterData existingCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
+                SpriteBone[] metaFileBones = existingCharacterData.bones ?? new SpriteBone[0];
+
+                Debug.Log($"Meta file bones: {string.Join(", ", metaFileBones.Select(b => b.name))}");
+                Debug.Log($"Editor cache bones: {string.Join(", ", characterBones.Select(b => b.name))}");
+
+                // 2. Generate CharacterParts (新しい順序)
                 characterParts = parts.Select(x =>
                     new CharacterPart()
                     {
@@ -510,8 +521,7 @@ namespace UnityEditor.U2D.Animation
                     }
                 ).ToArray();
 
-
-                // Create bone index mapping: スプライト内インデックス → キャラクター内インデックス
+                // 3. メタファイルのボーン順序 vs エディタキャッシュのボーン順序でマッピング作成
                 foreach (CharacterPartCache part in parts)
                 {
                     if (!boneIndexMappings.ContainsKey(part.sprite))
@@ -519,40 +529,45 @@ namespace UnityEditor.U2D.Animation
                         var mapping = new Dictionary<int, int>();
                         BoneCache[] spriteBones = part.sprite.GetSkeleton().bones;
 
-                        // characterPartsで生成された対応するボーン配列を取得
                         var correspondingCharacterPart = characterParts.First(cp => cp.spriteId == part.sprite.id);
 
                         for (int i = 0; i < spriteBones.Length; i++)
                         {
-                            // スプライト内のボーンがキャラクターのボーンリストでどのインデックスか
-                            int characterIndex = -1;
-                            for (int j = 0; j < characterBones.Length; j++)
+                            // スプライトのボーンをメタファイル内で検索
+                            int metaFileIndex = -1;
+                            for (int j = 0; j < metaFileBones.Length; j++)
                             {
-                                if (characterBones[j].guid == spriteBones[i].guid) // またはcategoryやnameで比較
+                                if (metaFileBones[j].guid == spriteBones[i].guid)
                                 {
-                                    characterIndex = j;
+                                    metaFileIndex = j;
                                     break;
                                 }
                             }
-                            if (characterIndex != -1)
+
+                            if (metaFileIndex != -1)
                             {
                                 // characterParts.bonesでの位置を求める
-                                int characterPartBoneIndex = Array.IndexOf(correspondingCharacterPart.bones, characterIndex);
-                                if (characterPartBoneIndex != -1)
+                                int newIndex = Array.IndexOf(correspondingCharacterPart.bones,
+                                    Array.FindIndex(characterBones, b => b.guid == spriteBones[i].guid));
+
+                                if (newIndex != -1)
                                 {
-                                    Debug.Log("found bond");
-                                    mapping[i] = characterPartBoneIndex;  // 正しいマッピング
-                                    if ( i != characterPartBoneIndex )
-                                        Debug.LogWarning($"[SkinningModule] Bone index mapping differs! SpriteBoneIndex={i}, CharacterPartBoneIndex={characterPartBoneIndex}, CharacterBoneIndex={characterIndex}, Sprite='{part.sprite.name}'");
+                                    mapping[i] = newIndex;
+                                    if (i != newIndex)
+                                    {
+                                        Debug.LogWarning($"[SkinningModule] Bone mapping: {spriteBones[i].name} {i}→{newIndex} (sprite: {part.sprite.name})");
+                                    }
                                 }
                             }
                         }
+
+                        Debug.Log($"Sprite {part.sprite.name} mapping: {string.Join(", ", mapping.Select(kvp => $"{kvp.Key}→{kvp.Value}"))}");
                         boneIndexMappings[part.sprite] = mapping;
                     }
                 }
             }
 
-            ApplyBone(skinningCache, dataProvider);
+
             ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
             ApplyCharacter(skinningCache, dataProvider, characterParts);
             skinningCache.applyingChanges = false;
