@@ -525,14 +525,25 @@ namespace UnityEditor.U2D.Animation
                         for (int i = 0; i < spriteBones.Length; i++)
                         {
                             // スプライト内のボーンがキャラクターのボーンリストでどのインデックスか
-                            int characterIndex = Array.IndexOf(characterBones, spriteBones[i]);
+                            int characterIndex = -1;
+                            for (int j = 0; j < characterBones.Length; j++)
+                            {
+                                if (characterBones[j].guid == spriteBones[i].guid) // またはcategoryやnameで比較
+                                {
+                                    characterIndex = j;
+                                    break;
+                                }
+                            }
                             if (characterIndex != -1)
                             {
                                 // characterParts.bonesでの位置を求める
                                 int characterPartBoneIndex = Array.IndexOf(correspondingCharacterPart.bones, characterIndex);
                                 if (characterPartBoneIndex != -1)
                                 {
+                                    Debug.Log("found bond");
                                     mapping[i] = characterPartBoneIndex;  // 正しいマッピング
+                                    if ( i != characterPartBoneIndex )
+                                        Debug.LogWarning($"[SkinningModule] Bone index mapping differs! SpriteBoneIndex={i}, CharacterPartBoneIndex={characterPartBoneIndex}, CharacterBoneIndex={characterIndex}, Sprite='{part.sprite.name}'");
                                 }
                             }
                         }
