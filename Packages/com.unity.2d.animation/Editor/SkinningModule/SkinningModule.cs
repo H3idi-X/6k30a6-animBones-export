@@ -642,7 +642,7 @@ namespace UnityEditor.U2D.Animation
         }
         static BoneWeight RemapBoneIndices(BoneWeight original, Dictionary<int, int> mapping)
         {
-            return new BoneWeight
+            var result = new BoneWeight
             {
                 boneIndex0 = mapping.ContainsKey(original.boneIndex0) ? mapping[original.boneIndex0] : original.boneIndex0,
                 boneIndex1 = mapping.ContainsKey(original.boneIndex1) ? mapping[original.boneIndex1] : original.boneIndex1,
@@ -653,6 +653,19 @@ namespace UnityEditor.U2D.Animation
                 weight2 = original.weight2,
                 weight3 = original.weight3
             };
+
+            // 実際にマッピングが適用されたかをチェック
+            bool changed = result.boneIndex0 != original.boneIndex0 ||
+                           result.boneIndex1 != original.boneIndex1 ||
+                           result.boneIndex2 != original.boneIndex2 ||
+                           result.boneIndex3 != original.boneIndex3;
+
+            if (changed)
+            {
+                Debug.Log($"--- RemapBoneIndices: ({original.boneIndex0},{original.boneIndex1},{original.boneIndex2},{original.boneIndex3}) → ({result.boneIndex0},{result.boneIndex1},{result.boneIndex2},{result.boneIndex3})");
+            }
+
+            return result;
         }
 
         static void ApplyCharacter(SkinningCache skinningCache, ISpriteEditorDataProvider dataProvider, CharacterPart[] characterParts)
