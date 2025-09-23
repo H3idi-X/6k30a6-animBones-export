@@ -492,7 +492,6 @@ namespace UnityEditor.U2D.Animation
         {
             skinningCache.applyingChanges = true;
             skinningCache.RestoreBindPose();
-            ApplyBone(skinningCache, dataProvider);
 
             Dictionary<SpriteCache, Dictionary<int, int>> boneIndexMappings = new Dictionary<SpriteCache, Dictionary<int, int>>();
             CharacterPart[] characterParts = null;
@@ -503,15 +502,14 @@ namespace UnityEditor.U2D.Animation
                 BoneCache[] characterBones = character.skeleton.bones;
                 CharacterPartCache[] parts = character.parts;
 
-                // 1. メタファイルから実際のボーン順序を取得
+                // 1. ApplyBone前の状態を保存
                 ICharacterDataProvider characterDataProvider = dataProvider.GetDataProvider<ICharacterDataProvider>();
-                CharacterData existingCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
-                SpriteBone[] metaFileBones = existingCharacterData.bones ?? new SpriteBone[0];
+                CharacterData beforeCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
+                SpriteBone[] beforeMetaFileBones = beforeCharacterData.bones ?? new SpriteBone[0];
 
-                Debug.Log($"Meta file bones: {string.Join(", ", metaFileBones.Select(b => b.name))}");
-                Debug.Log($"Editor cache bones: {string.Join(", ", characterBones.Select(b => b.name))}");
+                Debug.Log($"BEFORE - Meta file bones: {string.Join(", ", beforeMetaFileBones.Select(b => b.name))}");
 
-                // 2. Generate CharacterParts (新しい順序)
+                // 2. Generate CharacterParts
                 characterParts = parts.Select(x =>
                     new CharacterPart()
                     {
@@ -521,7 +519,17 @@ namespace UnityEditor.U2D.Animation
                     }
                 ).ToArray();
 
-                // 3. メタファイルのボーン順序 vs エディタキャッシュのボーン順序でマッピング作成
+                // 3. Apply operations
+                ApplyBone(skinningCache, dataProvider);
+                ApplyCharacter(skinningCache, dataProvider, characterParts);
+
+                // 4. ApplyCharacter後の新しい順序を取得
+                CharacterData afterCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
+                SpriteBone[] afterMetaFileBones = afterCharacterData.bones ?? new SpriteBone[0];
+
+                Debug.Log($"AFTER - Meta file bones: {string.Join(", ", afterMetaFileBones.Select(b => b.name))}");
+
+                // 5. 順序変化を基にマッピング作成
                 foreach (CharacterPartCache part in parts)
                 {
                     if (!boneIndexMappings.ContainsKey(part.sprite))
@@ -529,34 +537,21 @@ namespace UnityEditor.U2D.Animation
                         var mapping = new Dictionary<int, int>();
                         BoneCache[] spriteBones = part.sprite.GetSkeleton().bones;
 
-                        var correspondingCharacterPart = characterParts.First(cp => cp.spriteId == part.sprite.id);
-
                         for (int i = 0; i < spriteBones.Length; i++)
                         {
-                            // スプライトのボーンをメタファイル内で検索
-                            int metaFileIndex = -1;
-                            for (int j = 0; j < metaFileBones.Length; j++)
-                            {
-                                if (metaFileBones[j].guid == spriteBones[i].guid)
-                                {
-                                    metaFileIndex = j;
-                                    break;
-                                }
-                            }
+                            // BEFOREでの位置
+                            int beforeIndex = Array.FindIndex(beforeMetaFileBones, b => b.guid == spriteBones[i].guid);
+                            // AFTERでの位置  
+                            int afterIndex = Array.FindIndex(afterMetaFileBones, b => b.guid == spriteBones[i].guid);
 
-                            if (metaFileIndex != -1)
+                            if (beforeIndex != -1 && afterIndex != -1)
                             {
-                                // characterParts.bonesでの位置を求める
-                                int newIndex = Array.IndexOf(correspondingCharacterPart.bones,
-                                    Array.FindIndex(characterBones, b => b.guid == spriteBones[i].guid));
+                                // beforeIndex -> afterIndex への変換が必要
+                                mapping[beforeIndex] = afterIndex;
 
-                                if (newIndex != -1)
+                                if (beforeIndex != afterIndex)
                                 {
-                                    mapping[i] = newIndex;
-                                    if (i != newIndex)
-                                    {
-                                        Debug.LogWarning($"[SkinningModule] Bone mapping: {spriteBones[i].name} {i}→{newIndex} (sprite: {part.sprite.name})");
-                                    }
+                                    Debug.LogWarning($"[SkinningModule] Bone mapping: {spriteBones[i].name} {beforeIndex}→{afterIndex} (sprite: {part.sprite.name})");
                                 }
                             }
                         }
@@ -565,23 +560,17 @@ namespace UnityEditor.U2D.Animation
                         boneIndexMappings[part.sprite] = mapping;
                     }
                 }
+
+                // 6. メッシュに遡ってマッピング適用
+                ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
             }
-
-
-            ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
-            ApplyCharacter(skinningCache, dataProvider, characterParts);
-            if (false)
+            else
             {
-                ICharacterDataProvider characterDataProvider = dataProvider.GetDataProvider<ICharacterDataProvider>();
-                CharacterData newCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
-
-                SpriteBone[] newMetaFileBones = newCharacterData.bones ?? new SpriteBone[0];
-
-                Debug.Log($"Meta file bones: {string.Join(", ", newMetaFileBones.Select(b => b.name))}");
+                ApplyBone(skinningCache, dataProvider);
+                ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
             }
+
             skinningCache.applyingChanges = false;
-
-
         }
 
         private void DoApplyAnalytics()
