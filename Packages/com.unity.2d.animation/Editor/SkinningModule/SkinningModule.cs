@@ -571,6 +571,16 @@ namespace UnityEditor.U2D.Animation
             ApplyMesh(skinningCache, dataProvider, boneIndexMappings);
             ApplyCharacter(skinningCache, dataProvider, characterParts);
             skinningCache.applyingChanges = false;
+            {
+                ICharacterDataProvider characterDataProvider = dataProvider.GetDataProvider<ICharacterDataProvider>();
+                CharacterData newCharacterData = characterDataProvider?.GetCharacterData() ?? new CharacterData();
+
+                SpriteBone[] newMetaFileBones = newCharacterData.bones ?? new SpriteBone[0];
+
+                Debug.Log($"Meta file bones: {string.Join(", ", newMetaFileBones.Select(b => b.name))}");
+            }
+
+
         }
 
         private void DoApplyAnalytics()
